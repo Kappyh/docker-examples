@@ -1,6 +1,4 @@
-Estudos sobre Docker
-
--> Usa uma comando a menos ao montar o container, em relação a VM, usando
+-> Usa uma comada a menos ao montar o container, em relação a VM, usando
 os recursos do sistema operacional host alocado separadamente, ao invés de instalar um sistema operacional no container guest.
 
 -> o LXC é a tecnologia base do docker, porém o docker gerencia de forma mais fácil os containers e ainda disponibiliza uma API REST para gerenciar os containers e um CLI.
@@ -359,3 +357,132 @@ docker image push kappyh/simple-build:1.0
 ```
 
 Acesse seu dashboard no docker hub, a imagem estará lá no fim do processo.
+
+### Redes
+
+Modelos de rede
+
+- None network (sem acesso a rede externa)
+- Brigde Network(modelo padrão). Desenho:
+
+**Docker container -> Interface de rede do container -> Bridge(docker 0) -> Host -> Internet**
+
+- Host network ( Sem camada Bridge) 
+- Overlay Network (Swarm) - Somente modo swarm clusterizado
+
+```
+// Listar as listas
+docker network ls
+```
+
+Por padrão o docker já vem com 3 modelos criados: o bridge, o none network e o host network.
+
+Container com modelo None não tem acesso a rede externa e de nenhum outro container, porém tem acesso a volumes
+
+#### Criando um container sem rede ( none network )
+
+--rm cria o container, roda e remove em seguida
+Flag --net com valor none cria um container sem rede
+Alpine é uma distribuição linux, ash é um bash mais leve
+-c para rodar o comando
+```
+docker container run --rm --net none alpine ash -c "ifconfig"
+```
+
+
+#### Criando uma nova rede e conectando a um container
+
+Por padrão, redes novas que são criadas não tem acesso a todos os containers,
+como ocorre com a padrão Bridge.
+Porém é possível fazer a conexão entre containers a partir das redes criadas no modelo bridge.
+
+Criar uma nova rede
+O tipo da rede do comando abaixo pode ser bridge, none, ou host
+```
+docker network create --driver [tipo-da-rede/modelo] [nome-da-rede]
+```
+
+Criando um container que usa a nova rede
+A flag --net seguida do nome da rede criada
+```
+docker container run --rm --net [nome-da-rede] alpine [nome-do-container] ash -c "ifconfig"
+```
+
+Connectando um container a um outro bridge
+
+```
+docker network connect [nome-rede] [nome-container] 
+```
+
+Desconectando um container de um bridge
+```
+docker network disconnect [nome-rede] [nome-container] 
+```
+
+Verificando conexões de um brigde
+```
+docker network inspect [nome-da-rede]
+```
+
+#### Interface Host
+
+Remove a proteção da camada Bridge, porém fornece mais velocidade para conectar a internet
+Acessa a interface de rede direta da máquina Host.
+
+### Coordenando multiplos containers
+
+docker-compose é um arquivo para compor diversos containers, separando responsabilidades. O docker-compose vai referenciar as imagens criadas, criando novos containers e coordendando eles.
+
+Dentro do compose, cada container é um service.
+
+- Para rodar os comandos do docker-compose é necessário instala-lo
+https://docs.docker.com/compose/install/
+
+Sobre o arquivo yaml ou yml:
+- sintaxe hierárquica parecida com python
+
+version: -> indica versão do docker-compose
+services -> indica containers que serão criados
+	[nome-do-container]
+			image:->imagem que será utilizada no container
+			volumes:-> aponta caminho onde o volume irá apontar
+			ports:-> indica a porta do host:guest
+			command:-> indica comandos para rodar dentro do container
+			
+Exemplo de arquivo `docker-compose.yml`:
+```
+version: '3'
+
+services:
+
+db:
+
+image: mongo:3.4
+
+backend:
+
+image: node:8.1
+
+volumes:
+
+- ./backend:/backend
+
+ports:
+
+- 3000:3000
+
+command: bash -c "cd /backend && npm i && node app"
+
+frontend:
+
+image: nginx:1.13
+
+volumes:
+
+- ./frontend:/usr/share/nginx/html
+
+ports:
+
+- 81:80
+```
+
